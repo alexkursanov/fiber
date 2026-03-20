@@ -170,3 +170,45 @@ class StateIndices:
             cls.CA_SR, cls.CA_I, cls.K_I, cls.NA_I, cls.TRPN,
             cls.V, cls.H, cls.J, cls.M, cls.R_SS, cls.S_SS
         ]
+
+
+@dataclass
+class IschemiaConfig:
+    """Конфигурация ишемии"""
+    degree: int = 15
+    bz1_start: int = 25
+    bz1_end: int = 45
+    bz2_start: int = 75
+    bz2_end: int = 95
+    
+    def get_bzdegree(self, cell_idx: int) -> float:
+        """
+        Вычисляет степень ишемии для клетки
+        
+        Args:
+            cell_idx: индекс клетки (1-based)
+        
+        Returns:
+            Степень ишемии от 0 до 1
+        """
+        # Клетки в BZ1
+        if self.bz1_start <= cell_idx <= self.bz1_end:
+            bzdegree = (cell_idx - self.bz1_start) / (self.bz1_end - self.bz1_start + 1e-12)
+        # Клетки в BZ2
+        elif self.bz2_start <= cell_idx <= self.bz2_end:
+            bzdegree = (self.bz2_end - cell_idx) / (self.bz2_end - self.bz2_start + 1e-12)
+        else:
+            bzdegree = 0.0
+        
+        return max(0.0, min(1.0, bzdegree))
+    
+    @classmethod
+    def from_simulation_params(cls, params) -> 'IschemiaConfig':
+        """Создание из параметров симуляции"""
+        return cls(
+            degree=params.sim.IschemiaDeg,
+            bz1_start=params.sim.BZ1Start,
+            bz1_end=params.sim.BZ1End,
+            bz2_start=params.sim.BZ2Start,
+            bz2_end=params.sim.BZ2End
+        )
