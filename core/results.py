@@ -173,6 +173,53 @@ class StateIndices:
 
 
 @dataclass
+class ParameterCache:
+    """
+    Кэш вычисляемых констант для электрофизиологической модели
+    
+    Кэширует константы, которые не меняются во время симуляции,
+    но вычисляются из параметров при каждом вызове tnnpe().
+    
+    Применение:
+        cache = ParameterCache.from_params(params)
+        # Внутри tnnpe():
+        sqr_ryr = cache.sqr_ryr  # Вместо params.elec.K_RyR ** 2
+    """
+    # Константы из elec параметров
+    sqr_ryr: float          # K_RyR ** 2
+    exp_00001: float        # np.exp(-0.00001)
+    f_K: float              # f_K
+    tau_s_ss: float         # tau_s_ss
+    
+    # Константы из ekb параметров
+    a_eqmin: float          # a_eqmin
+    s_c: float              # s_c
+    
+    # Производные константы
+    inv_V_myo_uL_F: float   # 1.0 / (V_myo_uL * F)
+    inv_2_V_myo_uL_F: float # 1.0 / (2.0 * V_myo_uL * F)
+    inv_Cm: float           # 1.0 / Cm
+    
+    @classmethod
+    def from_params(cls, params) -> 'ParameterCache':
+        """Создание кэша из ModelParameters"""
+        elec = params.elec
+        ekb = params.ekb
+        
+        return cls(
+            sqr_ryr=elec.K_RyR ** 2,
+            exp_00001=np.exp(-0.00001),
+            f_K=elec.f_K,
+            tau_s_ss=elec.tau_s_ss,
+            a_eqmin=ekb.a_eqmin,
+            s_c=ekb.s_c,
+            inv_V_myo_uL_F=1.0 / (elec.V_myo_uL * elec.F),
+            inv_2_V_myo_uL_F=1.0 / (2.0 * elec.V_myo_uL * elec.F),
+            inv_Cm=1.0 / elec.Cm,
+        )
+
+
+@dataclass
 class IschemiaConfig:
     """Конфигурация ишемии"""
     degree: int = 15

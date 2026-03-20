@@ -44,7 +44,7 @@ def calculate_ischemia_params(IschemiaDeg, bzdegree, ATP_i, K_o, g_Na, J_L):
     return ATP_i, K_o, g_Na, J_L
 
 
-def tnnpe(time, Y, jj, N_elec, params, global_st):
+def tnnpe(time, Y, jj, N_elec, params, global_st, cache=None):
     """
     Правая часть системы ОДУ электрофизиологической модели
 
@@ -55,12 +55,18 @@ def tnnpe(time, Y, jj, N_elec, params, global_st):
         N_elec: N для электрической части
         params: параметры модели
         global_st: глобальное состояние
+        cache: ParameterCache для оптимизации (опционально)
 
     Возвращает:
         dYdt: производные
     """
     # Используем IschemiaConfig для вычисления bzdegree
     bzdegree = global_st.get_bzdegree_for_cell(jj)
+    
+    # Получаем кэш (создаём если не передан)
+    if cache is None:
+        from core.results import ParameterCache
+        cache = ParameterCache.from_params(params)
 
     # Копируем параметры для возможного изменения
     ATP_i = params.elec.ATP_i
@@ -101,20 +107,22 @@ def tnnpe(time, Y, jj, N_elec, params, global_st):
     V_SR_uL = params.elec.V_SR_uL
     V_myo = params.elec.V_myo
 
-    # Константы из параметров EKB
-    a_eqmin = params.ekb.a_eqmin
-    s_c = params.ekb.s_c
+    # Константы из EKB (из кэша)
+    a_eqmin = cache.a_eqmin
+    s_c = cache.s_c
 
-    # Вспомогательные константы
-    exp_00001 = np.exp(-0.00001)
+    # Вспомогательные константы (из кэша)
+    exp_00001 = cache.exp_00001
+    sqr_ryr = cache.sqr_ryr
+    f_K = cache.f_K
+    tau_s_ss = cache.tau_s_ss
+    
+    # Остальные константы
     t_R = params.elec.t_R
     alpha_m = params.elec.alpha_m
     beta_m = params.elec.beta_m
     g_Na_endo = params.elec.g_Na_endo
     sigma = params.elec.sigma
-    f_K = params.elec.f_K
-    tau_s_ss = params.elec.tau_s_ss
-    sqr_ryr = params.elec.K_RyR ** 2
 
     # TRPN dynamics
     pi_n1 = params.elec.GeneralTnC * s_c * N_elec / (TRPN + 1e-12)

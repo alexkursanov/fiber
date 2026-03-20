@@ -17,6 +17,7 @@ from core.solver import CardiacSolver
 from models.electrical import tnnpe, y_init
 from models.diffusion import solve_diffusion
 from file_io.h5_io import save_results_h5, load_results_h5, save_checkpoint, load_checkpoint
+from functools import partial
 
 # Попытка импорта визуализации
 try:
@@ -100,8 +101,12 @@ def main():
 
     # Запуск моделирования
     print("\n[5/6] Запуск моделирования...")
+    
+    # Создаём функцию с предустановленным кэшем
+    tnnpe_cached = partial(tnnpe, cache=solver.cache)
+    
     try:
-        solver.run(tnnpe, solve_diffusion)
+        solver.run(tnnpe_cached, solve_diffusion)
     except KeyboardInterrupt:
         print("\nМоделирование прервано пользователем")
         print("Сохранение контрольной точки...")
