@@ -277,6 +277,15 @@ class SimulationParameters:
         """Вычисляет производные параметры после инициализации"""
         self._compute_derived()
 
+    def __setattr__(self, name, value):
+        """Автоматически пересчитывает производные параметры при изменении"""
+        super().__setattr__(name, value)
+        # После изменения атрибута пересчитываем производные параметры
+        # Проверяем, что объект уже инициализирован (есть _compute_derived)
+        if hasattr(self, '_compute_derived') and hasattr(self, '_dt'):
+            if name in ('t0', 'ts', 's', 'x0', 'xn', 'n', 'D', 'L_tkani'):
+                self._compute_derived()
+
     def _compute_derived(self):
         """Вычисляет производные параметры"""
         self._dt = (self.ts - self.t0) / (self.s - 1) if self.s > 1 else 0

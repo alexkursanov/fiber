@@ -171,7 +171,7 @@ def main():
         except Exception as e:
             print(f"   ! Ошибка при создании графиков: {e}")
 
-            # Анимации
+        # Анимации (отдельный try-блок)
         if not args.no_plot and VISUALIZATION_AVAILABLE:
             print("\nСоздание анимаций...")
             try:

@@ -176,9 +176,9 @@ class CardiacSolver:
                 print(f"Ошибка при интегрировании клетки {jj}: {e}")
                 self.Y[i+1, jj, :] = self.Y1[jj, :]
 
-        # Токи для всех клеток
-        for jj in range(self.params.sim.n):
-            self.cell_currents[i, jj, :] = self.gs.cell_cur
+        # Токи сохраняются в gs.cell_cur после каждого вызова tnnpe_func
+        # Для первой клетки сохраняем после диффузии
+        self.cell_currents[i, 0, :] = self.gs.cell_cur
 
         self.Y[i+1, 0, :] = V_1
 
