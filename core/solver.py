@@ -28,10 +28,6 @@ class CardiacSolver:
         self.params = params
         self.gs = global_state
 
-        # Кэш констант (создаётся один раз)
-        from core.results import ParameterCache
-        self.cache = ParameterCache.from_params(params)
-
         # Массивы для результатов
         self._init_arrays()
 
