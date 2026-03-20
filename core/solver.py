@@ -157,9 +157,13 @@ class CardiacSolver:
             self.gs.jj = jj + 1
             self.gs.N_elec = self.N[i, jj]
 
+            # Сохраняем начальное состояние для токов
+            initial_currents = self.gs.cell_cur.copy()
+
             def rhs(t, y):
-                return tnnpe_func(t, y, self.gs.jj, self.gs.N_elec,
-                                  self.params, self.gs)
+                result = tnnpe_func(t, y, self.gs.jj, self.gs.N_elec,
+                                   self.params, self.gs)
+                return result
 
             try:
                 sol = solve_ivp(
@@ -176,8 +180,10 @@ class CardiacSolver:
                 print(f"Ошибка при интегрировании клетки {jj}: {e}")
                 self.Y[i+1, jj, :] = self.Y1[jj, :]
 
-        # Токи сохраняются в gs.cell_cur после каждого вызова tnnpe_func
-        # Для первой клетки сохраняем после диффузии
+            # Сохраняем токи для этой клетки
+            self.cell_currents[i, jj, :] = self.gs.cell_cur
+
+        # Сохраняем токи для первой клетки (после диффузии)
         self.cell_currents[i, 0, :] = self.gs.cell_cur
 
         self.Y[i+1, 0, :] = V_1

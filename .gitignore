@@ -216,3 +216,4 @@ __marimo__/
 .streamlit/secrets.toml
 
 results_plots_20260227_134137
+results_interrupted.h5
