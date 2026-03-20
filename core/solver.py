@@ -270,7 +270,7 @@ class CardiacSolver:
         print(f"Моделирование завершено за {elapsed:.2f} сек")
 
     def get_results(self):
-        """Возвращает результаты моделирования"""
+        """Возвращает результаты моделирования в виде словаря (обратная совместимость)"""
         return {
             'time': self.params.sim.t,
             'x': self.params.sim.x,
@@ -288,3 +288,30 @@ class CardiacSolver:
             'cell_currents': self.cell_currents,
             'deltaU': self.deltaU
         }
+    
+    def get_results_structured(self):
+        """Возвращает результаты в виде структурированного объекта SimulationResults"""
+        from core.results import SimulationResults
+        
+        return SimulationResults(
+            time=self.params.sim.t,
+            x=self.params.sim.x,
+            V=self.Y[:, :, 12],
+            Ca_i=self.Y[:, :, 8],
+            Ca_SR=self.Y[:, :, 7],
+            Na_i=self.Y[:, :, 10],
+            K_i=self.Y[:, :, 9],
+            TRPN=self.Y[:, :, 11],
+            N=self.N,
+            v=self.v,
+            l1=self.l_1,
+            l2=self.l_2,
+            l3=self.l_3,
+            cell_currents=self.cell_currents,
+            deltaU=self.deltaU,
+            ischemia=self.params.sim.IschemiaDeg,
+            duration=self.params.sim.ts,
+            n_cells=self.params.sim.n,
+            n_time_points=self.params.sim.s,
+            diffusion=self.params.sim.D
+        )
