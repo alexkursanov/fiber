@@ -67,7 +67,7 @@ class CardiacSolver:
         alpha_3 = self.params.ekb.alpha_3
         beta_3 = self.params.ekb.beta_3
 
-        self.v[0, :] = -0.00000163008453003026
+        self.v[0, :] = 2.74398486397373e-06  # Match MATLAB .mat file
         self.w[0, :] = 7.62412076632331e-07
         self.l_2[0, :] = np.log((r0 + beta_2) / beta_2) / alpha_2
         self.l_1[0, :] = (self.l_2[0, 0] +
@@ -75,7 +75,7 @@ class CardiacSolver:
                            beta_2 * (np.exp(alpha_2 * self.l_2[0, 0]) - 1))) /
                           alpha_2)
         self.l_3[0] = np.log((beta_3 + r0) / beta_3) / alpha_3
-        self.N[0, :] = 0.0000284517486098194
+        self.N[0, :] = 5.6528465136942426e-06  # Match MATLAB .mat file
 
         self.gs.L = (self.params.sim.n - 1) * self.l_2[0, 0] * \
                     self.params.sim.dx + self.l_3[0]
@@ -115,7 +115,7 @@ class CardiacSolver:
                     rhs,
                     [t_current, t_current + dt/2],
                     self.Y[i, jj, :],
-                    method='BDF', rtol=1e-6, atol=1e-8
+                    method='Radau', rtol=1e-4, atol=1e-6
                 )
                 if sol.y.size > 0:
                     self.Y1[jj, :] = sol.y[:, -1]
@@ -170,7 +170,7 @@ class CardiacSolver:
                     rhs,
                     [t_current + dt/2, t_next],
                     self.Y1[jj, :],
-                    method='BDF', rtol=1e-6, atol=1e-8
+                    method='Radau', rtol=1e-4, atol=1e-6
                 )
                 if sol.y.size > 0:
                     self.Y[i+1, jj, :] = sol.y[:, -1]
@@ -210,18 +210,19 @@ class CardiacSolver:
             else:
                 Lam_mech = self.params.ekb.llambda
 
-            # Решение механической части
+            # Для первой клетки Y[i+1, 0] обновляется после диффузии, используем Y[i, 0]
+            Y_for_mech = self.Y[i, j, :] if j == 0 else self.Y[i+1, j, :]
             try:
                 v_new, l1_new, N_new = solve_mechanical(
                     self.v[i, j], self.l_1[i, j], self.l_2[i, j],
-                    self.l_3[i], self.N[i, j], self.Y[i+1, j, :],
+                    self.l_3[i], self.N[i, j], Y_for_mech,
                     dt, Lam_mech, self.params
                 )
 
                 self.v[i+1, j] = v_new
                 self.l_1[i+1, j] = l1_new
                 self.N[i+1, j] = N_new
-                self.gs.l1_n[j] = l1_new
+                self.gs.l1_n[j] = max(l1_new, 0.0)
             except Exception as e:
                 print(f"Ошибка в механической части для клетки {j}: {e}")
                 self.v[i+1, j] = self.v[i, j]
@@ -244,8 +245,8 @@ class CardiacSolver:
             l2_l3_sol = fsolve(l2l3_func, l2n_l3, xtol=1e-8)
 
             for j in range(self.params.sim.n):
-                self.l_2[i+1, j] = l2_l3_sol[j]
-            self.l_3[i+1] = l2_l3_sol[self.params.sim.n]
+                self.l_2[i+1, j] = max(l2_l3_sol[j], 0.0)
+            self.l_3[i+1] = max(l2_l3_sol[self.params.sim.n], 0.0)
         except Exception as e:
             print(f"Ошибка в l2l3: {e}")
             self.l_2[i+1, :] = self.l_2[i, :]

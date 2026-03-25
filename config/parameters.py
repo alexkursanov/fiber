@@ -39,7 +39,7 @@ class EKBParameters:
     S_0: float = 1.14           # micrometre
     chi_1: float = 0.55         # dimensionless
     chi_2: float = 0.0          # dimensionless
-    r0: float = 0.12            # preload
+    r0: float = 0.081           # preload (MATLAB: 0.081)
 
     d_h: float = 0.5            # dimensionless
     m: float = 1.7              # dimensionless

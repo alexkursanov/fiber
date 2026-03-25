@@ -209,14 +209,15 @@ def tnnpe(time, Y, jj, N_elec, params, global_st):
     y_oo = (alpha_p *
             (beta_poc * (alpha_p + beta_m + beta_pcc) +
              beta_pcc * alpha_m) * denom)
-    y_ci = alpha_m / (alpha_p + alpha_m)
-    y_oi = alpha_p / (alpha_p + alpha_m)
-    y_ic = beta_m / (beta_pcc + beta_m)
-    y_io = beta_pcc / (beta_pcc + beta_m)
+    y_ci = alpha_m / (alpha_p + alpha_m + 1e-100)
+    y_oi = alpha_p / (alpha_p + alpha_m + 1e-100)
+    y_ic = beta_m / (beta_pcc + beta_m + 1e-100)
+    y_io = beta_pcc / (beta_pcc + beta_m + 1e-100)
     y_ii = 1.0 - y_oc - y_co - y_oo - y_cc - y_ci - y_ic - y_oi - y_io
-
+    y_ii = np.clip(y_ii, 0.0, 1.0)
+    
     C_cc = Ca_i
-
+    
     # J_Rco, J_Roo
     J_Rco = params.elec.J_R * (Ca_SR - Ca_i) / (1.0 + params.elec.J_R / params.elec.g_D)
 
@@ -462,6 +463,9 @@ def tnnpe(time, Y, jj, N_elec, params, global_st):
 
     global_st.cell_cur = cell_cur
 
+    # Защита от NaN/Inf
+    dY = np.nan_to_num(dY, nan=0.0, posinf=1e10, neginf=-1e10)
+
     return dY
 
 
@@ -639,11 +643,12 @@ def tnnpe_explicit(time, Y, cell_idx, N_elec, elec_params, ekb_params, ischemia)
     y_oo = (alpha_p *
             (beta_poc * (alpha_p + beta_m + beta_pcc) +
              beta_pcc * alpha_m) * denom)
-    y_ci = alpha_m / (alpha_p + alpha_m)
-    y_oi = alpha_p / (alpha_p + alpha_m)
-    y_ic = beta_m / (beta_pcc + beta_m)
-    y_io = beta_pcc / (beta_pcc + beta_m)
+    y_ci = alpha_m / (alpha_p + alpha_m + 1e-100)
+    y_oi = alpha_p / (alpha_p + alpha_m + 1e-100)
+    y_ic = beta_m / (beta_pcc + beta_m + 1e-100)
+    y_io = beta_pcc / (beta_pcc + beta_m + 1e-100)
     y_ii = 1.0 - y_oc - y_co - y_oo - y_cc - y_ci - y_ic - y_oi - y_io
+    y_ii = np.clip(y_ii, 0.0, 1.0)
     
     C_cc = Ca_i
     
@@ -883,6 +888,9 @@ def tnnpe_explicit(time, Y, cell_idx, N_elec, elec_params, ekb_params, ischemia)
         i_Na, i_t, i_ss, i_f, i_K1, i_B_Na, i_B_K, i_NaK,
         I_Stim, I_CaB_1, I_NaCa_1, I_pCa_1, I_LCC_2, i_K_ATP
     ])
+    
+    # Защита от NaN/Inf
+    dY = np.nan_to_num(dY, nan=0.0, posinf=1e10, neginf=-1e10)
     
     return dY, currents
 

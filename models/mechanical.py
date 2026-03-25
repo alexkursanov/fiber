@@ -165,10 +165,17 @@ def l2l3(x, l1_n, L, dx, params):
     alpha_2, beta_2 = params.ekb.alpha_2, params.ekb.beta_2
     alpha_3, beta_3 = params.ekb.alpha_3, params.ekb.beta_3
 
+    x_safe = np.clip(x, -50, 50)
+    l1_safe = np.clip(l1_n, -50, 50)
+
     for i in range(n):
-        F[i] = (beta_2 * (np.exp(alpha_2 * x[i]) - 1.0) +
-                beta_1 * (np.exp(alpha_1 * (x[i] - l1_n[i])) - 1.0) -
-                beta_3 * (np.exp(alpha_3 * x[n]) - 1.0))
+        exp_arg2 = np.clip(alpha_2 * x_safe[i], -700, 700)
+        exp_arg1 = np.clip(alpha_1 * (x_safe[i] - l1_safe[i]), -700, 700)
+        exp_arg3 = np.clip(alpha_3 * x_safe[n], -700, 700)
+        
+        F[i] = (beta_2 * (np.exp(exp_arg2) - 1.0) +
+                beta_1 * (np.exp(exp_arg1) - 1.0) -
+                beta_3 * (np.exp(exp_arg3) - 1.0))
         F[n] += x[i]
 
     a_val = x[0]
@@ -242,7 +249,7 @@ def solve_mechanical(v_old, l1_old, l2_old, l3_old, N_old,
     K_chi = (k_p_v * M_A * n_1 * L_oz * (1.0 - N_old) - k_m_v * N_old)
 
     N_new = N_old + dt * K_chi
-    N_new = max(0.0, min(1.0, N_new))  # Ограничиваем значение
+    N_new = np.clip(N_new, 0.0, 1.0)
 
     # Решение для скорости v
     def v_func(vv):
