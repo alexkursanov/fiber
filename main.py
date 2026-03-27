@@ -15,6 +15,7 @@ from config.parameters import ModelParameters, EKBParameters, ElectricalParamete
 from core.state import GlobalState
 from core.solver import CardiacSolver
 from models.electrical import tnnpe, y_init
+from models.electrical_numba import tnnpe_numba
 from models.diffusion import solve_diffusion
 from file_io.h5_io import save_results_h5, load_results_h5, save_checkpoint, load_checkpoint
 
@@ -101,7 +102,7 @@ def main():
     # Запуск моделирования
     print("\n[5/6] Запуск моделирования...")
     try:
-        solver.run(tnnpe, solve_diffusion)
+        solver.run(tnnpe_numba, solve_diffusion)
     except KeyboardInterrupt:
         print("\nМоделирование прервано пользователем")
         print("Сохранение контрольной точки...")

@@ -77,7 +77,8 @@ class CardiacSolver:
         self.l_3[0] = np.log((beta_3 + r0) / beta_3) / alpha_3
         self.N[0, :] = 5.6528465136942426e-06  # Match MATLAB .mat file
 
-        self.gs.L = (self.params.sim.n - 1) * self.l_2[0, 0] * \
+        self.gs.L = (np.sum(self.l_2[0, :]) - 
+                    (self.l_2[0, 0] / 2 + self.l_2[0, -1] / 2)) * \
                     self.params.sim.dx + self.l_3[0]
         self.gs.l1_n = self.l_1[0, :].copy()
 

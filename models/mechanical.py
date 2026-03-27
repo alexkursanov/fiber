@@ -1,6 +1,7 @@
 """
 Механическая модель сократительных элементов
 """
+
 import numpy as np
 from scipy.optimize import fsolve
 import sys
@@ -11,14 +12,17 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Попытка импорта numba для ускорения
 try:
     from numba import jit
+
     USE_NUMBA = True
 except ImportError:
     USE_NUMBA = False
     print("Numba не установлен. Работаем без JIT-ускорения.")
+
     # Создаем заглушку для декоратора jit
     def jit(nopython=True, cache=True):
         def decorator(func):
             return func
+
         return decorator
 
 
@@ -28,7 +32,7 @@ def compute_q_v(v, v_max, q_1, q_2, q_3, q_4, v_st, beta_Q, alpha_Q):
     if v <= 0.0:
         return q_1 - q_2 * v / v_max
     elif v <= v_st:
-        return ((q_4 - q_3) * v / v_st + q_3)
+        return (q_4 - q_3) * v / v_st + q_3
     else:
         return q_4 / (1.0 + beta_Q * (v - v_st) / v_max) ** alpha_Q
 
@@ -39,10 +43,12 @@ def compute_P_star(v, v_max, a, d_h, gamma2):
     if v <= 0.0:
         return a * (1.0 + v / v_max) / (a - v / v_max)
     else:
-        term = (v / v_max)
-        return (1.0 + d_h - d_h ** 2.0 * a /
-                (a * d_h / gamma2 * term ** 2.0 +
-                 (a + 1.0) * term + a * d_h))
+        term = v / v_max
+        return (
+            1.0
+            + d_h
+            - d_h**2.0 * a / (a * d_h / gamma2 * term**2.0 + (a + 1.0) * term + a * d_h)
+        )
 
 
 @jit(nopython=True, cache=True)
@@ -57,8 +63,11 @@ def compute_G_star(v, v_max, a, d_h, alpha_G, alpha_P, v_1, gamma2):
         return P_star / ((0.4 * a + 1.0) * term / a + 1.0)
     else:
         P_star = compute_P_star(v, v_max, a, d_h, gamma2)
-        return (P_star * np.exp(-alpha_G * ((v - v_1) / v_max) ** alpha_P) /
-                ((0.4 * a + 1.0) * term / a + 1.0))
+        return (
+            P_star
+            * np.exp(-alpha_G * ((v - v_1) / v_max) ** alpha_P)
+            / ((0.4 * a + 1.0) * term / a + 1.0)
+        )
 
 
 @jit(nopython=True, cache=True)
@@ -73,8 +82,9 @@ def compute_p_ext(v, v_max, a, v_1, alpha_G, alpha_P):
     elif v <= v_1:
         return (0.4 * a + 1.0) * term / a + 1.0
     else:
-        return ((0.4 * a + 1.0) * term / a + 1.0) * \
-               np.exp(alpha_G * (term - 0.1) ** alpha_P)
+        return ((0.4 * a + 1.0) * term / a + 1.0) * np.exp(
+            alpha_G * (term - 0.1) ** alpha_P
+        )
 
 
 @jit(nopython=True, cache=True)
@@ -94,8 +104,7 @@ def compute_n1(l1, g_1, g_2, n1_A, n1_K, n1_C, n1_Q, n1_B, n1_nu):
 @jit(nopython=True, cache=True)
 def compute_M_A(Ca_ratio, mu, k_mu):
     """Вычисление M_A"""
-    return (Ca_ratio ** mu * (1.0 + k_mu ** mu) /
-            (Ca_ratio ** mu + k_mu ** mu + 1e-12))
+    return Ca_ratio**mu * (1.0 + k_mu**mu) / (Ca_ratio**mu + k_mu**mu + 1e-12)
 
 
 @jit(nopython=True, cache=True)
@@ -121,25 +130,49 @@ def v_meh(v, l1, l2, l3, N_meh, Lam_mech, params):
     Возвращает:
         F: невязка
     """
+    # Защита от NaN
+    if np.isnan(l1) or np.isnan(l2) or np.isnan(l3) or np.isnan(N_meh):
+        return 1e10
+
+    N_meh_safe = np.clip(N_meh, 0.0, 1.0)
+    l1_safe = max(l1, 0.0001)  # только ограничение снизу
+    l2_safe = max(l2, 0.0001)
+    l3_safe = max(l3, 0.0001)
+
     # Вспомогательные переменные
     v_max = params.ekb.v_max
     v_1 = v_max / 10.0
 
     # Вязкий коэффициент
     if v <= 0.0:
-        k_P_vis = params.ekb.beta_vp_l * np.exp(params.ekb.alpha_vp_l * l1)
+        k_P_vis = params.ekb.beta_vp_l * np.exp(params.ekb.alpha_vp_l * l1_safe)
     else:
-        k_P_vis = params.ekb.beta_vp_s * np.exp(params.ekb.alpha_vp_s * l1)
+        k_P_vis = params.ekb.beta_vp_s * np.exp(params.ekb.alpha_vp_s * l1_safe)
 
     # p_v
-    p_v = compute_p_ext(v, v_max, params.ekb.a, v_1,
-                        params.ekb.alpha_G, params.ekb.alpha_P)
+    p_v = compute_p_ext(
+        v, v_max, params.ekb.a, v_1, params.ekb.alpha_G, params.ekb.alpha_P
+    )
+
+    # Защита от NaN в p_v
+    if np.isnan(p_v) or np.isinf(p_v):
+        p_v = 1.0
+
+    # Защита от переполнения экспоненты
+    exp_arg2 = np.clip(params.ekb.alpha_2 * l2_safe, -700, 700)
+    exp_arg3 = np.clip(params.ekb.alpha_3 * l3_safe, -700, 700)
 
     # Невязка
-    F = (params.ekb.beta_2 * (np.exp(params.ekb.alpha_2 * l2) - 1.0) +
-         Lam_mech * p_v * N_meh +
-         k_P_vis * v -
-         params.ekb.beta_3 * (np.exp(params.ekb.alpha_3 * l3) - 1.0))
+    F = (
+        params.ekb.beta_2 * (np.exp(exp_arg2) - 1.0)
+        + Lam_mech * p_v * N_meh_safe
+        + k_P_vis * v
+        - params.ekb.beta_3 * (np.exp(exp_arg3) - 1.0)
+    )
+
+    # Защита от NaN в результате
+    if np.isnan(F) or np.isinf(F):
+        F = 1e10
 
     return F
 
@@ -159,34 +192,35 @@ def l2l3(x, l1_n, L, dx, params):
         F: невязка для fsolve
     """
     n = len(l1_n)
-    F = np.zeros(n + 1)
-
+    
     alpha_1, beta_1 = params.ekb.alpha_1, params.ekb.beta_1
     alpha_2, beta_2 = params.ekb.alpha_2, params.ekb.beta_2
     alpha_3, beta_3 = params.ekb.alpha_3, params.ekb.beta_3
 
     x_safe = np.clip(x, -50, 50)
     l1_safe = np.clip(l1_n, -50, 50)
-
-    for i in range(n):
-        exp_arg2 = np.clip(alpha_2 * x_safe[i], -700, 700)
-        exp_arg1 = np.clip(alpha_1 * (x_safe[i] - l1_safe[i]), -700, 700)
-        exp_arg3 = np.clip(alpha_3 * x_safe[n], -700, 700)
-        
-        F[i] = (beta_2 * (np.exp(exp_arg2) - 1.0) +
-                beta_1 * (np.exp(exp_arg1) - 1.0) -
-                beta_3 * (np.exp(exp_arg3) - 1.0))
-        F[n] += x[i]
-
-    a_val = x[0]
-    b_val = x[n - 1]
-    F[n] = (F[n] - (a_val / 2 + b_val / 2)) * dx + x[n] - L
+    
+    l2_arr = x_safe[:n]
+    l3_val = x_safe[n]
+    delta = l2_arr - l1_safe
+    
+    exp_arg2 = np.clip(alpha_2 * l2_arr, -700, 700)
+    exp_arg1 = np.clip(alpha_1 * delta, -700, 700)
+    exp_arg3 = np.clip(alpha_3 * l3_val, -700, 700)
+    
+    F = np.empty(n + 1)
+    F[:n] = (beta_2 * (np.exp(exp_arg2) - 1.0) +
+             beta_1 * (np.exp(exp_arg1) - 1.0) -
+             beta_3 * (np.exp(exp_arg3) - 1.0))
+    
+    F[n] = (np.sum(l2_arr) - (x_safe[0] / 2 + x_safe[n - 1] / 2)) * dx + x_safe[n] - L
 
     return F
 
 
-def solve_mechanical(v_old, l1_old, l2_old, l3_old, N_old,
-                     Y_next, dt, Lam_mech, params):
+def solve_mechanical(
+    v_old, l1_old, l2_old, l3_old, N_old, Y_next, dt, Lam_mech, params
+):
     """
     Решение механической части для одной клетки
 
@@ -205,22 +239,38 @@ def solve_mechanical(v_old, l1_old, l2_old, l3_old, N_old,
     v_max = params.ekb.v_max
     v_st = params.ekb.x_st * v_max
     v_1 = v_max / 10.0
-    gamma2 = (params.ekb.a * params.ekb.d_h * (0.1) ** 2.0 /
-              (3.0 * params.ekb.a * params.ekb.d_h -
-               (params.ekb.a + 1.0) * 0.1))
+    gamma2 = (
+        params.ekb.a
+        * params.ekb.d_h
+        * (0.1) ** 2.0
+        / (3.0 * params.ekb.a * params.ekb.d_h - (params.ekb.a + 1.0) * 0.1)
+    )
 
     # q_v
-    q_v = compute_q_v(v_old, v_max,
-                      params.ekb.q_1, params.ekb.q_2,
-                      params.ekb.q_3, params.ekb.q_4,
-                      v_st, params.ekb.beta_Q, params.ekb.alpha_Q)
+    q_v = compute_q_v(
+        v_old,
+        v_max,
+        params.ekb.q_1,
+        params.ekb.q_2,
+        params.ekb.q_3,
+        params.ekb.q_4,
+        v_st,
+        params.ekb.beta_Q,
+        params.ekb.alpha_Q,
+    )
 
     # P_star и G_star
-    P_star = compute_P_star(v_old, v_max, params.ekb.a,
-                            params.ekb.d_h, gamma2)
-    G_star = compute_G_star(v_old, v_max, params.ekb.a,
-                            params.ekb.d_h, params.ekb.alpha_G,
-                            params.ekb.alpha_P, v_1, gamma2)
+    P_star = compute_P_star(v_old, v_max, params.ekb.a, params.ekb.d_h, gamma2)
+    G_star = compute_G_star(
+        v_old,
+        v_max,
+        params.ekb.a,
+        params.ekb.d_h,
+        params.ekb.alpha_G,
+        params.ekb.alpha_P,
+        v_1,
+        gamma2,
+    )
 
     # chi
     if v_old <= 0.0:
@@ -235,26 +285,30 @@ def solve_mechanical(v_old, l1_old, l2_old, l3_old, N_old,
     M_A = compute_M_A(Ca_ratio, params.ekb.mu, params.ekb.k_mu)
 
     # n_1
-    n_1 = compute_n1(l1_old,
-                     params.ekb.g_1, params.ekb.g_2,
-                     params.ekb.n1_A, params.ekb.n1_K,
-                     params.ekb.n1_C, params.ekb.n1_Q,
-                     params.ekb.n1_B, params.ekb.n1_nu)
+    n_1 = compute_n1(
+        l1_old,
+        params.ekb.g_1,
+        params.ekb.g_2,
+        params.ekb.n1_A,
+        params.ekb.n1_K,
+        params.ekb.n1_C,
+        params.ekb.n1_Q,
+        params.ekb.n1_B,
+        params.ekb.n1_nu,
+    )
 
     # L_oz
-    L_oz = compute_L_oz(l1_old, params.ekb.S_0,
-                        params.ekb.s055, params.ekb.s046)
+    L_oz = compute_L_oz(l1_old, params.ekb.S_0, params.ekb.s055, params.ekb.s046)
 
     k_m_v = params.ekb.chi_0 * q_v * (1.0 - chi * params.ekb.m_0 * G_star)
-    K_chi = (k_p_v * M_A * n_1 * L_oz * (1.0 - N_old) - k_m_v * N_old)
+    K_chi = k_p_v * M_A * n_1 * L_oz * (1.0 - N_old) - k_m_v * N_old
 
     N_new = N_old + dt * K_chi
     N_new = np.clip(N_new, 0.0, 1.0)
 
     # Решение для скорости v
     def v_func(vv):
-        return v_meh(vv[0], l1_old, l2_old, l3_old,
-                     N_new, Lam_mech, params)
+        return v_meh(vv[0], l1_old, l2_old, l3_old, N_new, Lam_mech, params)
 
     try:
         v_sol = fsolve(v_func, v_old, xtol=1e-8)
@@ -264,5 +318,12 @@ def solve_mechanical(v_old, l1_old, l2_old, l3_old, N_old,
 
     # Обновление l1
     l1_new = l1_old + dt * v_new
+    l1_new = max(l1_new, 0.001)  # не может быть слишком маленькой
+    l1_new = min(l1_new, 1.0)    # не может быть слишком большой (физический предел)
+
+    # Защита от нефизических значений
+    if l1_new > 0.5:  # если l1 слишком большой, остановить движение
+        v_new = 0.0
+        l1_new = min(l1_old, 0.5)
 
     return v_new, l1_new, N_new
